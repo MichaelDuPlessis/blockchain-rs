@@ -17,7 +17,7 @@ impl Transaction {
         ]
         .into_iter()
         .flatten()
-        .map(|b| *b)
+        .copied()
         .collect::<Vec<u8>>()
     }
 

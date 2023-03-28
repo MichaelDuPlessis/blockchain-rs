@@ -25,8 +25,7 @@ impl Blockchain {
 
     // getting the last block from the chain
     pub fn latest_block(&self) -> &Block {
-        &self
-            .blocks
+        self.blocks
             .last()
             .expect("There should always be a latest block")
     }
@@ -56,7 +55,7 @@ impl Blockchain {
             .map(|block| {
                 block
                     .transactions()
-                    .into_iter()
+                    .iter()
                     .filter_map(|transaction| {
                         if transaction.from() == address {
                             Some(-(transaction.amount() as i64))

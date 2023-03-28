@@ -22,14 +22,13 @@ fn calculate_hash(
         &timestamp.to_be_bytes(),
         &nonce.to_be_bytes(),
         &transactions
-            .into_iter()
-            .map(|transaction| transaction.as_bytes())
-            .flatten()
+            .iter()
+            .flat_map(|transaction| transaction.as_bytes())
             .collect::<Vec<u8>>(),
     ]
     .into_iter()
     .flatten()
-    .map(|b| *b)
+    .copied()
     .collect();
 
     sha2::Sha256::digest(bytes).into()
