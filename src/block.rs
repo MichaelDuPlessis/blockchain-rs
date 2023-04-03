@@ -1,38 +1,13 @@
 use sha2::Digest;
 use std::time::SystemTime;
 
-use crate::transaction::Transaction;
+use crate::transaction::{self, Transaction};
 
 const DIFFICULTY: usize = 2; // how many bytes need to be -
 const DIFFICULTY_TEST: [u8; DIFFICULTY] = [0; DIFFICULTY];
 
 // alias for the size of a hash
-type Hash = [u8; 32];
-
-// the function to calculate a hash
-fn calculate_hash(
-    timestamp: u64,
-    nonce: u64,
-    transactions: &[Transaction],
-    prev_hash: &[u8],
-) -> Hash {
-    // this code nees to be fixed later
-    let bytes: Vec<_> = [
-        prev_hash,
-        &timestamp.to_be_bytes(),
-        &nonce.to_be_bytes(),
-        &transactions
-            .iter()
-            .flat_map(|transaction| transaction.as_bytes())
-            .collect::<Vec<u8>>(),
-    ]
-    .into_iter()
-    .flatten()
-    .copied()
-    .collect();
-
-    sha2::Sha256::digest(bytes).into()
-}
+pub type Hash = [u8; 32];
 
 // A block of a blockchain
 pub struct Block {
@@ -55,7 +30,7 @@ impl Block {
         // mining the block and getting the nonce
         let mut nonce = 0;
         let hash = loop {
-            let hash = calculate_hash(timestamp, nonce, &transactions, &prev_hash);
+            let hash = Self::calculate_hash(timestamp, nonce, &transactions, &prev_hash);
             if hash[..DIFFICULTY] == DIFFICULTY_TEST {
                 break hash;
             }
@@ -70,6 +45,41 @@ impl Block {
             hash,
             nonce,
         }
+    }
+
+    pub fn valid_transactions(&self) -> bool {
+        for transaction in &self.transactions {
+            if !transaction.valid() {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    // the function to calculate a hash
+    pub fn calculate_hash(
+        timestamp: u64,
+        nonce: u64,
+        transactions: &[Transaction],
+        prev_hash: &[u8],
+    ) -> Hash {
+        // this code nees to be fixed later
+        let bytes: Vec<_> = [
+            prev_hash,
+            &timestamp.to_be_bytes(),
+            &nonce.to_be_bytes(),
+            &transactions
+                .iter()
+                .flat_map(|transaction| transaction.signiture_hash())
+                .collect::<Vec<u8>>(),
+        ]
+        .into_iter()
+        .flatten()
+        .copied()
+        .collect();
+
+        sha2::Sha256::digest(bytes).into()
     }
 
     // gets the previous hash

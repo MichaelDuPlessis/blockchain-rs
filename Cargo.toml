@@ -6,4 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+elliptic-curve = "0.13.2"
+k256 = { version = "0.13.0", features = ["serde", "pem"] }
+rand = "0.8.5"
+serde_json = "1.0.95"
 sha2 = "0.10.6"

@@ -31,11 +31,8 @@ impl Blockchain {
     }
 
     pub fn mine_pending_transactions(&mut self, reward_address: impl Into<String>) {
-        let mut transactions = vec![Transaction::new(
-            String::new(),
-            reward_address.into(),
-            REWARD,
-        )]; // creating new mempool with reward
+        let mut transactions = vec![Transaction::new(None, reward_address.into(), REWARD)]; // creating new mempool with reward
+
         std::mem::swap(&mut transactions, &mut self.mempool);
 
         // block is mined when it is created
@@ -44,6 +41,10 @@ impl Blockchain {
     }
 
     pub fn add_transaction(&mut self, transaction: Transaction) {
+        if !transaction.valid() {
+            panic!("Invalid transaction cannot be added");
+        }
+
         self.mempool.push(transaction);
     }
 
@@ -57,12 +58,20 @@ impl Blockchain {
                     .transactions()
                     .iter()
                     .filter_map(|transaction| {
-                        if transaction.from() == address {
-                            Some(-(transaction.amount() as i64))
-                        } else if transaction.to() == address {
-                            Some(transaction.amount() as i64)
+                        if let Some(from) = transaction.from() {
+                            if from == address {
+                                Some(-(transaction.amount() as i64))
+                            } else if transaction.to() == address {
+                                Some(transaction.amount() as i64)
+                            } else {
+                                None
+                            }
                         } else {
-                            None
+                            if transaction.to() == address {
+                                Some(transaction.amount() as i64)
+                            } else {
+                                None
+                            }
                         }
                     })
                     .sum::<i64>()
@@ -74,5 +83,33 @@ impl Blockchain {
         } else {
             Ok(balance as u64)
         }
+    }
+
+    fn valid(&self) -> bool {
+        for i in 1..self.blocks.len() {
+            let cur_block = &self.blocks[i];
+            let prev_block = &self.blocks[i - 1];
+
+            if !cur_block.valid_transactions() {
+                return false;
+            }
+
+            if cur_block.hash()
+                != Block::calculate_hash(
+                    cur_block.timestamp(),
+                    cur_block.nonce(),
+                    cur_block.transactions(),
+                    &cur_block.prev_hash(),
+                )
+            {
+                return false;
+            }
+
+            if cur_block.prev_hash() != prev_block.hash() {
+                return false;
+            }
+        }
+
+        true
     }
 }
