@@ -73,12 +73,10 @@ impl Blockchain {
                             } else {
                                 None
                             }
+                        } else if transaction.to() == address {
+                            Some(transaction.amount() as i64)
                         } else {
-                            if transaction.to() == address {
-                                Some(transaction.amount() as i64)
-                            } else {
-                                None
-                            }
+                            None
                         }
                     })
                     .sum::<i64>()

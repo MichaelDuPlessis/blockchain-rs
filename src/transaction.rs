@@ -93,7 +93,7 @@ impl Transaction {
             return false;
         }
 
-        let public_key: VerifyingKey = serde_json::from_str(&from).unwrap();
+        let public_key: VerifyingKey = serde_json::from_str(from).unwrap();
         let signiture = Signature::from_bytes(GenericArray::from_slice(&self.signiture)).unwrap();
         public_key.verify(&self.hash, &signiture).is_ok()
     }
