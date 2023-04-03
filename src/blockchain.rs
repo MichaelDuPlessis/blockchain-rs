@@ -2,6 +2,12 @@ use crate::{block::Block, transaction::Transaction};
 
 const REWARD: u64 = 10; // for now just constant
 
+#[derive(Debug)]
+pub enum BlockchainError {
+    InvalidTransaction,
+    NegativeBalance,
+}
+
 // The actual blockchain
 pub struct Blockchain {
     blocks: Vec<Block>,
@@ -40,16 +46,17 @@ impl Blockchain {
         self.blocks.push(block);
     }
 
-    pub fn add_transaction(&mut self, transaction: Transaction) {
+    pub fn add_transaction(&mut self, transaction: Transaction) -> Result<(), BlockchainError> {
         if !transaction.valid() {
-            panic!("Invalid transaction cannot be added");
+            return Err(BlockchainError::InvalidTransaction);
         }
 
         self.mempool.push(transaction);
+        Ok(())
     }
 
     // if balance is negative transaction cannot be maid
-    pub fn balance_of(&self, address: &str) -> Result<u64, ()> {
+    pub fn balance_of(&self, address: &str) -> Result<u64, BlockchainError> {
         let balance = self
             .blocks
             .iter()
@@ -79,7 +86,7 @@ impl Blockchain {
             .sum::<i64>();
 
         if balance.is_negative() {
-            Err(())
+            Err(BlockchainError::NegativeBalance)
         } else {
             Ok(balance as u64)
         }

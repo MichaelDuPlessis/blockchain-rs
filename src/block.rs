@@ -1,7 +1,7 @@
 use sha2::Digest;
 use std::time::SystemTime;
 
-use crate::transaction::{self, Transaction};
+use crate::transaction::Transaction;
 
 const DIFFICULTY: usize = 2; // how many bytes need to be -
 const DIFFICULTY_TEST: [u8; DIFFICULTY] = [0; DIFFICULTY];

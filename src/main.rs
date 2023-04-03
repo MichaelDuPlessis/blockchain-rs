@@ -25,15 +25,15 @@ fn main() {
         25,
     );
 
-    t1.sign_transaction(&my_address.0);
-    t2.sign_transaction(&my_address.0);
-    t3.sign_transaction(&other_address.0);
+    t1.sign_transaction(&my_address.0).unwrap();
+    t2.sign_transaction(&my_address.0).unwrap();
+    t3.sign_transaction(&other_address.0).unwrap();
 
     let mut blockchain = blockchain::Blockchain::default();
 
-    blockchain.add_transaction(t1);
-    blockchain.add_transaction(t2);
-    blockchain.add_transaction(t3);
+    blockchain.add_transaction(t1).unwrap();
+    blockchain.add_transaction(t2).unwrap();
+    blockchain.add_transaction(t3).unwrap();
 
     blockchain.mine_pending_transactions(serde_json::to_string(&other_address.1).unwrap());
 

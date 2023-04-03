@@ -1,12 +1,16 @@
-use core::panic;
-
 use crate::block::Hash;
-use elliptic_curve::{generic_array::GenericArray, SecretKey};
+use elliptic_curve::generic_array::GenericArray;
 use k256::{
     ecdsa::{Signature, SigningKey, VerifyingKey},
     schnorr::signature::{Signer, Verifier},
 };
 use sha2::Digest;
+
+#[derive(Debug)]
+pub enum TransactionError {
+    NoFromSignError,
+    ForeignPubkey,
+}
 
 pub struct Transaction {
     from: Option<String>,
@@ -62,20 +66,22 @@ impl Transaction {
         sha2::Sha256::digest(bytes).into()
     }
 
-    pub fn sign_transaction(&mut self, private_key: &SigningKey) {
+    pub fn sign_transaction(&mut self, private_key: &SigningKey) -> Result<(), TransactionError> {
         let Some(from) = self.from.as_ref() else {
-            panic!("Cannot sign a transaction from none.")
+            return Err(TransactionError::NoFromSignError)
         };
 
         let public_key = VerifyingKey::from(private_key);
         let public_key = serde_json::to_string(&public_key).unwrap();
 
         if &public_key != from {
-            panic!("Cannot sign transaction for foreign public key");
+            return Err(TransactionError::ForeignPubkey);
         }
 
         let signiture: Signature = private_key.sign(&self.hash);
         self.signiture = signiture.to_bytes().to_vec();
+
+        Ok(())
     }
 
     pub fn valid(&self) -> bool {
@@ -84,7 +90,7 @@ impl Transaction {
         };
 
         if self.signiture.is_empty() {
-            panic!("Signature is empty")
+            return false;
         }
 
         let public_key: VerifyingKey = serde_json::from_str(&from).unwrap();
