@@ -1,4 +1,8 @@
-use crate::{block::Block, transaction::Transaction};
+use crate::{
+    block::Block,
+    transaction::{self, Transaction},
+};
+use indexmap::IndexMap;
 
 const REWARD: u64 = 10; // for now just constant
 
@@ -92,6 +96,25 @@ impl Blockchain {
         } else {
             Ok(balance as u64)
         }
+    }
+
+    // returns the address and amount owed to an address
+    pub fn loans_of(&self, address: &str) -> IndexMap<&str, u64> {
+        let mut loans = IndexMap::new();
+
+        for block in self.blocks() {
+            for transaction in block.transactions() {
+                if transaction.loan() {
+                    if let Some(loan) = loans.get_mut(transaction.to()) {
+                        *loan += transaction.amount();
+                    } else {
+                        loans.insert(transaction.to(), transaction.amount());
+                    }
+                }
+            }
+        }
+
+        loans
     }
 
     fn valid(&self) -> bool {
