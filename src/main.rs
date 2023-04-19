@@ -13,16 +13,19 @@ fn main() {
         Some(serde_json::to_string(&my_address.1).unwrap()),
         serde_json::to_string(&other_address.1).unwrap(),
         100,
+        false,
     );
     let mut t2 = Transaction::new(
         Some(serde_json::to_string(&my_address.1).unwrap()),
         serde_json::to_string(&other_address.1).unwrap(),
         50,
+        false,
     );
     let mut t3 = Transaction::new(
         Some(serde_json::to_string(&other_address.1).unwrap()),
         serde_json::to_string(&my_address.1).unwrap(),
         25,
+        false,
     );
 
     t1.sign_transaction(&my_address.0).unwrap();

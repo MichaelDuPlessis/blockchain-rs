@@ -18,11 +18,12 @@ pub struct Transaction {
     amount: u64,
     hash: Hash,
     signiture: Vec<u8>,
+    loan: bool,
 }
 
 impl Transaction {
-    pub fn new(from: Option<String>, to: String, amount: u64) -> Self {
-        let hash = Self::hash(&from, &to, amount);
+    pub fn new(from: Option<String>, to: String, amount: u64, loan: bool) -> Self {
+        let hash = Self::hash(&from, &to, amount, loan);
 
         Self {
             from,
@@ -30,6 +31,7 @@ impl Transaction {
             amount,
             hash,
             signiture: Vec::new(),
+            loan,
         }
     }
 
@@ -49,7 +51,11 @@ impl Transaction {
         self.hash
     }
 
-    fn hash(from: &Option<String>, to: &str, amount: u64) -> Hash {
+    pub fn loan(&self) -> bool {
+        self.loan
+    }
+
+    fn hash(from: &Option<String>, to: &str, amount: u64, loan: bool) -> Hash {
         let bytes = [
             match from {
                 Some(f) => f.as_bytes(),
@@ -57,6 +63,7 @@ impl Transaction {
             },
             to.as_bytes(),
             &amount.to_be_bytes(),
+            if loan { &[1] } else { &[0] },
         ]
         .into_iter()
         .flatten()

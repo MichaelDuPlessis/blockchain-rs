@@ -37,7 +37,7 @@ impl Blockchain {
     }
 
     pub fn mine_pending_transactions(&mut self, reward_address: impl Into<String>) {
-        let mut transactions = vec![Transaction::new(None, reward_address.into(), REWARD)]; // creating new mempool with reward
+        let mut transactions = vec![Transaction::new(None, reward_address.into(), REWARD, false)]; // creating new mempool with reward
 
         std::mem::swap(&mut transactions, &mut self.mempool);
 
@@ -55,7 +55,7 @@ impl Blockchain {
         Ok(())
     }
 
-    // if balance is negative transaction cannot be maid
+    // if balance is negative transaction cannot be made
     pub fn balance_of(&self, address: &str) -> Result<u64, BlockchainError> {
         let balance = self
             .blocks
@@ -65,16 +65,20 @@ impl Blockchain {
                     .transactions()
                     .iter()
                     .filter_map(|transaction| {
-                        if let Some(from) = transaction.from() {
-                            if from == address {
-                                Some(-(transaction.amount() as i64))
+                        if !transaction.loan() {
+                            if let Some(from) = transaction.from() {
+                                if from == address {
+                                    Some(-(transaction.amount() as i64))
+                                } else if transaction.to() == address {
+                                    Some(transaction.amount() as i64)
+                                } else {
+                                    None
+                                }
                             } else if transaction.to() == address {
                                 Some(transaction.amount() as i64)
                             } else {
                                 None
                             }
-                        } else if transaction.to() == address {
-                            Some(transaction.amount() as i64)
                         } else {
                             None
                         }
