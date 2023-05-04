@@ -3,68 +3,180 @@ mod blockchain;
 mod keygen;
 mod transaction;
 
+use std::collections::HashMap;
+
+use blockchain::Blockchain;
+use k256::ecdsa::{SigningKey, VerifyingKey};
+use text_io::read;
 use transaction::Transaction;
 
+enum Input {
+    List,
+    Pay,
+    Add,
+    Loan,
+    Info,
+    Mine,
+    Exit,
+    Invalid,
+}
+
+impl From<String> for Input {
+    fn from(value: String) -> Self {
+        match value.as_ref() {
+            "list" => Self::List,
+            "pay" => Self::Pay,
+            "add" => Self::Add,
+            "loan" => Self::Loan,
+            "info" => Self::Info,
+            "mine" => Self::Mine,
+            "exit" => Self::Exit,
+            _ => Self::Invalid,
+        }
+    }
+}
+
 fn main() {
-    let my_address = keygen::gen_key_pair();
-    let other_address = keygen::gen_key_pair();
+    let mut blockchain = Blockchain::default();
+    let mut users: HashMap<String, (SigningKey, VerifyingKey)> = HashMap::new();
 
-    let mut t1 = Transaction::new(
-        Some(serde_json::to_string(&my_address.1).unwrap()),
-        serde_json::to_string(&other_address.1).unwrap(),
-        100,
-        false,
-    );
-    let mut t2 = Transaction::new(
-        Some(serde_json::to_string(&my_address.1).unwrap()),
-        serde_json::to_string(&other_address.1).unwrap(),
-        50,
-        false,
-    );
-    let mut t3 = Transaction::new(
-        Some(serde_json::to_string(&other_address.1).unwrap()),
-        serde_json::to_string(&my_address.1).unwrap(),
-        25,
-        false,
-    );
+    loop {
+        println!("Enter a command:");
+        let input: String = read!("{}\n");
+        let input = Input::from(input);
 
-    t1.sign_transaction(&my_address.0).unwrap();
-    t2.sign_transaction(&my_address.0).unwrap();
-    t3.sign_transaction(&other_address.0).unwrap();
+        match input {
+            Input::List => list(&users),
+            Input::Pay => pay(&users, &mut blockchain),
+            Input::Loan => loan(&users, &mut blockchain),
+            Input::Add => add(&mut users),
+            Input::Info => info(&users, &blockchain),
+            Input::Mine => mine(&users, &mut blockchain),
+            Input::Exit => break,
+            Input::Invalid => println!("Unknown command."),
+        }
 
-    let mut blockchain = blockchain::Blockchain::default();
-
-    blockchain.add_transaction(t1).unwrap();
-    blockchain.add_transaction(t2).unwrap();
-    blockchain.add_transaction(t3).unwrap();
-
-    blockchain.mine_pending_transactions(serde_json::to_string(&other_address.1).unwrap());
-
-    for block in blockchain.blocks() {
-        println!("prev_hash: {:x?}", block.prev_hash());
-        println!("hash: {:x?}", block.hash());
+        println!();
     }
+}
+
+fn list(users: &HashMap<String, (SigningKey, VerifyingKey)>) {
+    println!("Users");
+    for (name, address) in users {
+        println!("{} {}", name, serde_json::to_string(&address.1).unwrap());
+    }
+}
+
+fn pay(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &mut Blockchain) {
+    println!("Who is paying");
+    let input: String = read!("{}\n");
+    let payer = if let Some(user) = users.get(&input) {
+        user
+    } else {
+        println!("No user found.");
+        return;
+    };
+
+    println!("Who is being paid");
+    let input: String = read!("{}\n");
+    let payee = if let Some(user) = users.get(&input) {
+        user
+    } else {
+        println!("No user found.");
+        return;
+    };
+
+    println!("Enter an amount to pay:");
+    let amount: u64 = read!("{}\n");
+    // let amount = amount.parse::<u64>().unwrap();
+
+    let mut transaction = Transaction::new(
+        Some(serde_json::to_string(&payer.1).unwrap()),
+        serde_json::to_string(&payee.1).unwrap(),
+        amount,
+        false,
+    );
+
+    transaction.sign_transaction(&payer.0).unwrap();
+    blockchain.add_transaction(transaction).unwrap();
+}
+
+fn add(users: &mut HashMap<String, (SigningKey, VerifyingKey)>) {
+    println!("Enter a username:");
+    let input: String = read!("{}\n");
+
+    let address = keygen::gen_key_pair();
+
+    users.insert(input, address);
+}
+
+fn mine(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &mut Blockchain) {
+    println!("Enter a username:");
+    let input: String = read!("{}\n");
+    let user = if let Some(user) = users.get(&input) {
+        user
+    } else {
+        println!("No user found.");
+        return;
+    };
+
+    blockchain.mine_pending_transactions(serde_json::to_string(&user.1).unwrap());
+}
+
+fn info(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &Blockchain) {
+    println!("Enter a username:");
+    let input: String = read!("{}\n");
+    let user = if let Some(user) = users.get(&input) {
+        user
+    } else {
+        println!("No user found.");
+        return;
+    };
 
     println!(
         "Balance: {}",
         blockchain
-            .balance_of(&serde_json::to_string(&other_address.1).unwrap())
+            .balance_of(&serde_json::to_string(&user.1).unwrap())
             .unwrap()
     );
 
-    println!("============================================");
-
-    blockchain.mine_pending_transactions(serde_json::to_string(&other_address.1).unwrap());
-
-    for block in blockchain.blocks() {
-        println!("prev_hash: {:x?}", block.prev_hash());
-        println!("hash: {:x?}", block.hash());
+    println!("Loans:");
+    let loans = blockchain.loans_of(&serde_json::to_string(&user.1).unwrap());
+    for loan in loans {
+        println!("Amount {} to {}", loan.1, loan.0);
     }
+}
 
-    println!(
-        "Balance: {}",
-        blockchain
-            .balance_of(&serde_json::to_string(&other_address.1).unwrap())
-            .unwrap()
+fn loan(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &mut Blockchain) {
+    println!("Who is loaing");
+    let input: String = read!("{}\n");
+    let payer = if let Some(user) = users.get(&input) {
+        user
+    } else {
+        println!("No user found.");
+        return;
+    };
+
+    println!("Who is loaner");
+    let input: String = read!("{}\n");
+    let payee = if let Some(user) = users.get(&input) {
+        user
+    } else {
+        println!("No user found.");
+        return;
+    };
+
+    println!("Enter an amount to loan:");
+    let amount: u64 = read!("{}\n");
+    // let amount = amount.parse::<u64>().unwrap();
+
+    let mut transaction = Transaction::new(
+        Some(serde_json::to_string(&payer.1).unwrap()),
+        serde_json::to_string(&payee.1).unwrap(),
+        amount,
+        true,
     );
+
+    transaction.sign_transaction(&payer.0).unwrap();
+    blockchain.add_transaction(transaction).unwrap();
 }

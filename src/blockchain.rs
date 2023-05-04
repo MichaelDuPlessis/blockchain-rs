@@ -43,6 +43,25 @@ impl Blockchain {
     pub fn mine_pending_transactions(&mut self, reward_address: impl Into<String>) {
         let mut transactions = vec![Transaction::new(None, reward_address.into(), REWARD, false)]; // creating new mempool with reward
 
+        for transaction in &self.mempool {
+            let loans = self.loans_of(transaction.to());
+            let mut amount_recieved = transaction.amount();
+
+            for (to, amount) in &loans {
+                if let Some(remaining) = amount_recieved.checked_sub(*amount) {
+                    amount_recieved = remaining;
+                    transactions.push(Transaction::new(
+                        Some(transaction.to().to_owned()),
+                        to.to_owned().to_owned(),
+                        *amount,
+                        false,
+                    ));
+                } else {
+                    break;
+                }
+            }
+        }
+
         std::mem::swap(&mut transactions, &mut self.mempool);
 
         // block is mined when it is created
@@ -115,6 +134,53 @@ impl Blockchain {
         }
 
         loans
+    }
+
+    pub fn paid_to(&self, from: &str, to: &str) -> u64 {
+        self.blocks()
+            .iter()
+            .map(|block| {
+                block
+                    .transactions()
+                    .iter()
+                    .filter_map(|transaction| {
+                        if let Some(f) = transaction.from().as_ref() {
+                            if f == from && transaction.to() == to {
+                                Some(transaction.amount())
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .sum::<u64>()
+            })
+            .sum()
+    }
+
+    pub fn total_loan_cost(&self, from: &str, to: &str) -> u64 {
+        self.blocks()
+            .iter()
+            .map(|block| {
+                block
+                    .transactions()
+                    .iter()
+                    .filter(|transaction| transaction.loan())
+                    .filter_map(|transaction| {
+                        if let Some(f) = transaction.from().as_ref() {
+                            if f == from && transaction.to() == to {
+                                Some(transaction.amount())
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .sum::<u64>()
+            })
+            .sum()
     }
 
     fn valid(&self) -> bool {
