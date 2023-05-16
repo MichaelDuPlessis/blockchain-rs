@@ -4,12 +4,13 @@ use crate::{
 };
 use indexmap::IndexMap;
 
-const REWARD: u64 = 10; // for now just constant
+const REWARD: u64 = 1000; // for now just constant
 
 #[derive(Debug)]
 pub enum BlockchainError {
     InvalidTransaction,
     NegativeBalance,
+    BalanceTooSmall,
 }
 
 // The actual blockchain
@@ -74,6 +75,14 @@ impl Blockchain {
             return Err(BlockchainError::InvalidTransaction);
         }
 
+        if let Ok(balance) = self.balance_of(transaction.from().as_ref().unwrap()) {
+            if transaction.amount() > balance {
+                return Err(BlockchainError::BalanceTooSmall);
+            }
+        } else {
+            return Err(BlockchainError::BalanceTooSmall);
+        }
+
         self.mempool.push(transaction);
         Ok(())
     }
@@ -124,10 +133,12 @@ impl Blockchain {
         for block in self.blocks() {
             for transaction in block.transactions() {
                 if transaction.loan() {
-                    if let Some(loan) = loans.get_mut(transaction.to()) {
-                        *loan += transaction.amount();
-                    } else {
-                        loans.insert(transaction.to(), transaction.amount());
+                    if transaction.from().as_ref().unwrap() == address {
+                        if let Some(loan) = loans.get_mut(transaction.to()) {
+                            *loan += transaction.amount();
+                        } else {
+                            loans.insert(transaction.to(), transaction.amount());
+                        }
                     }
                 }
             }
