@@ -12,7 +12,7 @@ pub enum TransactionError {
     ForeignPubkey,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransactionKind {
     Normal,
     Loan(Option<Vec<u8>>), // the other parties signiture
@@ -43,6 +43,7 @@ impl TransactionKind {
     }
 }
 
+#[derive(Debug)]
 pub struct Transaction {
     from: Option<String>,
     to: String,
@@ -54,7 +55,7 @@ pub struct Transaction {
 
 impl Transaction {
     pub fn new(from: Option<String>, to: String, amount: u64, kind: TransactionKind) -> Self {
-        let hash = Self::hash(&from, &to, amount, kind);
+        let hash = Self::hash(&from, &to, amount, &kind);
 
         Self {
             from,
@@ -90,11 +91,11 @@ impl Transaction {
         self.hash
     }
 
-    pub fn kind(&self) -> TransactionKind {
-        self.kind
+    pub fn kind(&self) -> &TransactionKind {
+        &self.kind
     }
 
-    fn hash(from: &Option<String>, to: &str, amount: u64, kind: TransactionKind) -> Hash {
+    fn hash(from: &Option<String>, to: &str, amount: u64, kind: &TransactionKind) -> Hash {
         let bytes = [
             match from {
                 Some(f) => f.as_bytes(),

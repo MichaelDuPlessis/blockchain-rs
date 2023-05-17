@@ -42,7 +42,7 @@ fn main() {
     let mut users: HashMap<String, (SigningKey, VerifyingKey)> = HashMap::new();
 
     loop {
-        println!("Enter a command:");
+        println!("Enter a command: (list, pay, add, loan, info, mine, exit)");
         let input: String = read!("{}\n");
         let input = Input::from(input);
 
@@ -135,14 +135,26 @@ fn info(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &Blockc
     };
 
     println!(
-        "Balance: {}",
+        "Balance: {}\n",
         blockchain
             .balance_of(&serde_json::to_string(&user.1).unwrap())
             .unwrap()
     );
 
-    println!("Loans:");
-    let loans = blockchain.loans_of(&serde_json::to_string(&user.1).unwrap());
+    println!("Signed Loans:");
+    let loans = blockchain.loans_of(&serde_json::to_string(&user.1).unwrap(), true);
+    for loan in loans {
+        println!("Amount {} to {}", loan.1, loan.0);
+    }
+    let loans = blockchain.all_loans_of(&serde_json::to_string(&user.1).unwrap());
+    for loan in loans {
+        println!("Amount {} to {}", loan.1, loan.0);
+    }
+
+    println!();
+
+    println!("Unsigned Loans:");
+    let loans = blockchain.loans_of(&serde_json::to_string(&user.1).unwrap(), false);
     for loan in loans {
         println!("Amount {} to {}", loan.1, loan.0);
     }
@@ -169,13 +181,12 @@ fn loan(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &mut Bl
 
     println!("Enter an amount to loan:");
     let amount: u64 = read!("{}\n");
-    // let amount = amount.parse::<u64>().unwrap();
 
     let mut transaction = Transaction::new(
         Some(serde_json::to_string(&payer.1).unwrap()),
         serde_json::to_string(&payee.1).unwrap(),
         amount,
-        TransactionKind::Loan,
+        TransactionKind::Loan(None),
     );
 
     transaction.sign_transaction(&payer.0).unwrap();

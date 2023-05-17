@@ -51,7 +51,7 @@ impl Blockchain {
 
         let mut to_remove = Vec::new();
         for (i, transaction) in self.mempool.iter().enumerate() {
-            let loans = self.loans_of(transaction.to());
+            let loans = self.all_loans_of(transaction.to());
             let mut amount_recieved = transaction.amount();
 
             for (to, amount) in &loans {
@@ -140,19 +140,40 @@ impl Blockchain {
         }
     }
 
-    // returns the address and amount owed to an address
-    pub fn loans_of(&self, address: &str) -> IndexMap<&str, u64> {
+    // for all loans returns the address and amount owed to an address
+    // looks in blockchain
+    pub fn all_loans_of(&self, address: &str) -> IndexMap<&str, u64> {
         let mut loans = IndexMap::new();
 
         for block in self.blocks() {
             for transaction in block.transactions() {
                 if transaction.is_loan() {
-                    if transaction.from().as_ref().unwrap() == address {
+                    if transaction.to() == address {
                         if let Some(loan) = loans.get_mut(transaction.to()) {
                             *loan += transaction.amount();
                         } else {
                             loans.insert(transaction.to(), transaction.amount());
                         }
+                    }
+                }
+            }
+        }
+
+        loans
+    }
+
+    // returns the loans of a user
+    // looks in mempool
+    pub fn loans_of(&self, address: &str, valid: bool) -> IndexMap<&str, u64> {
+        let mut loans = IndexMap::new();
+
+        for transaction in &self.mempool {
+            if transaction.is_loan() && transaction.loan_signed() == valid {
+                if transaction.to() == address {
+                    if let Some(loan) = loans.get_mut(transaction.to()) {
+                        *loan += transaction.amount();
+                    } else {
+                        loans.insert(transaction.to(), transaction.amount());
                     }
                 }
             }
