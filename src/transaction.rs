@@ -12,18 +12,43 @@ pub enum TransactionError {
     ForeignPubkey,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum TransactionKind {
+    Normal,
+    Loan,
+    Repayment,
+}
+
+impl TransactionKind {
+    fn bytes(&self) -> &[u8] {
+        match self {
+            TransactionKind::Normal => &[0],
+            TransactionKind::Loan => &[1],
+            TransactionKind::Repayment => &[2],
+        }
+    }
+
+    fn is_loan(&self) -> bool {
+        if self == &TransactionKind::Loan {
+            true
+        } else {
+            false
+        }
+    }
+}
+
 pub struct Transaction {
     from: Option<String>,
     to: String,
     amount: u64,
     hash: Hash,
     signiture: Vec<u8>,
-    loan: bool,
+    kind: TransactionKind,
 }
 
 impl Transaction {
-    pub fn new(from: Option<String>, to: String, amount: u64, loan: bool) -> Self {
-        let hash = Self::hash(&from, &to, amount, loan);
+    pub fn new(from: Option<String>, to: String, amount: u64, kind: TransactionKind) -> Self {
+        let hash = Self::hash(&from, &to, amount, kind);
 
         Self {
             from,
@@ -31,8 +56,12 @@ impl Transaction {
             amount,
             hash,
             signiture: Vec::new(),
-            loan,
+            kind,
         }
+    }
+
+    pub fn is_loan(&self) -> bool {
+        self.kind.is_loan()
     }
 
     pub fn from(&self) -> &Option<String> {
@@ -51,11 +80,11 @@ impl Transaction {
         self.hash
     }
 
-    pub fn loan(&self) -> bool {
-        self.loan
+    pub fn kind(&self) -> TransactionKind {
+        self.kind
     }
 
-    fn hash(from: &Option<String>, to: &str, amount: u64, loan: bool) -> Hash {
+    fn hash(from: &Option<String>, to: &str, amount: u64, kind: TransactionKind) -> Hash {
         let bytes = [
             match from {
                 Some(f) => f.as_bytes(),
@@ -63,7 +92,7 @@ impl Transaction {
             },
             to.as_bytes(),
             &amount.to_be_bytes(),
-            if loan { &[1] } else { &[0] },
+            kind.bytes(),
         ]
         .into_iter()
         .flatten()

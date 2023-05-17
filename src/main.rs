@@ -3,12 +3,13 @@ mod blockchain;
 mod keygen;
 mod transaction;
 
-use std::collections::HashMap;
-
 use blockchain::Blockchain;
 use k256::ecdsa::{SigningKey, VerifyingKey};
+use std::collections::HashMap;
 use text_io::read;
 use transaction::Transaction;
+
+use crate::transaction::TransactionKind;
 
 enum Input {
     List,
@@ -94,7 +95,7 @@ fn pay(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &mut Blo
         Some(serde_json::to_string(&payer.1).unwrap()),
         serde_json::to_string(&payee.1).unwrap(),
         amount,
-        false,
+        TransactionKind::Normal,
     );
 
     transaction.sign_transaction(&payer.0).unwrap();
@@ -174,7 +175,7 @@ fn loan(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &mut Bl
         Some(serde_json::to_string(&payer.1).unwrap()),
         serde_json::to_string(&payee.1).unwrap(),
         amount,
-        true,
+        TransactionKind::Loan,
     );
 
     transaction.sign_transaction(&payer.0).unwrap();

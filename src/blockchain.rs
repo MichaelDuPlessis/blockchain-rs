@@ -1,6 +1,6 @@
 use crate::{
     block::Block,
-    transaction::{self, Transaction},
+    transaction::{self, Transaction, TransactionKind},
 };
 use indexmap::IndexMap;
 
@@ -42,7 +42,12 @@ impl Blockchain {
     }
 
     pub fn mine_pending_transactions(&mut self, reward_address: impl Into<String>) {
-        let mut transactions = vec![Transaction::new(None, reward_address.into(), REWARD, false)]; // creating new mempool with reward
+        let mut transactions = vec![Transaction::new(
+            None,
+            reward_address.into(),
+            REWARD,
+            TransactionKind::Normal,
+        )]; // creating new mempool with reward
 
         for transaction in &self.mempool {
             let loans = self.loans_of(transaction.to());
@@ -55,7 +60,7 @@ impl Blockchain {
                         Some(transaction.to().to_owned()),
                         to.to_owned().to_owned(),
                         *amount,
-                        false,
+                        TransactionKind::Repayment,
                     ));
                 } else {
                     break;
@@ -76,6 +81,7 @@ impl Blockchain {
         }
 
         if let Ok(balance) = self.balance_of(transaction.from().as_ref().unwrap()) {
+            // making sure user has enough to pay
             if transaction.amount() > balance {
                 return Err(BlockchainError::BalanceTooSmall);
             }
@@ -97,20 +103,16 @@ impl Blockchain {
                     .transactions()
                     .iter()
                     .filter_map(|transaction| {
-                        if !transaction.loan() {
-                            if let Some(from) = transaction.from() {
-                                if from == address {
-                                    Some(-(transaction.amount() as i64))
-                                } else if transaction.to() == address {
-                                    Some(transaction.amount() as i64)
-                                } else {
-                                    None
-                                }
+                        if let Some(from) = transaction.from() {
+                            if from == address {
+                                Some(-(transaction.amount() as i64))
                             } else if transaction.to() == address {
                                 Some(transaction.amount() as i64)
                             } else {
                                 None
                             }
+                        } else if transaction.to() == address {
+                            Some(transaction.amount() as i64)
                         } else {
                             None
                         }
@@ -132,7 +134,7 @@ impl Blockchain {
 
         for block in self.blocks() {
             for transaction in block.transactions() {
-                if transaction.loan() {
+                if transaction.is_loan() {
                     if transaction.from().as_ref().unwrap() == address {
                         if let Some(loan) = loans.get_mut(transaction.to()) {
                             *loan += transaction.amount();
@@ -177,7 +179,7 @@ impl Blockchain {
                 block
                     .transactions()
                     .iter()
-                    .filter(|transaction| transaction.loan())
+                    .filter(|transaction| transaction.is_loan())
                     .filter_map(|transaction| {
                         if let Some(f) = transaction.from().as_ref() {
                             if f == from && transaction.to() == to {
