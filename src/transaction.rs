@@ -10,6 +10,7 @@ use sha2::Digest;
 pub enum TransactionError {
     NoFromSignError,
     ForeignPubkey,
+    NotLoan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,7 +56,7 @@ pub struct Transaction {
 
 impl Transaction {
     pub fn new(from: Option<String>, to: String, amount: u64, kind: TransactionKind) -> Self {
-        let hash = Self::hash(&from, &to, amount, &kind);
+        let hash = Self::hash_transaction(&from, &to, amount, &kind);
 
         Self {
             from,
@@ -87,7 +88,7 @@ impl Transaction {
         self.amount
     }
 
-    pub fn signiture_hash(&self) -> Hash {
+    pub fn hash(&self) -> Hash {
         self.hash
     }
 
@@ -95,7 +96,12 @@ impl Transaction {
         &self.kind
     }
 
-    fn hash(from: &Option<String>, to: &str, amount: u64, kind: &TransactionKind) -> Hash {
+    fn hash_transaction(
+        from: &Option<String>,
+        to: &str,
+        amount: u64,
+        kind: &TransactionKind,
+    ) -> Hash {
         let bytes = [
             match from {
                 Some(f) => f.as_bytes(),
@@ -127,6 +133,27 @@ impl Transaction {
 
         let signiture: Signature = private_key.sign(&self.hash);
         self.signiture = signiture.to_bytes().to_vec();
+
+        Ok(())
+    }
+
+    pub fn sign_loan_transaction(
+        &mut self,
+        private_key: &SigningKey,
+    ) -> Result<(), TransactionError> {
+        if !self.is_loan() {
+            return Err(TransactionError::NotLoan);
+        }
+
+        let public_key = VerifyingKey::from(private_key);
+        let public_key = serde_json::to_string(&public_key).unwrap();
+
+        if self.to != public_key {
+            return Err(TransactionError::ForeignPubkey);
+        }
+
+        let signiture: Signature = private_key.sign(&self.hash);
+        self.kind = TransactionKind::Loan(Some(signiture.to_bytes().to_vec()));
 
         Ok(())
     }

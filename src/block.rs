@@ -71,7 +71,7 @@ impl Block {
             &nonce.to_be_bytes(),
             &transactions
                 .iter()
-                .flat_map(|transaction| transaction.signiture_hash())
+                .flat_map(|transaction| transaction.hash())
                 .collect::<Vec<u8>>(),
         ]
         .into_iter()

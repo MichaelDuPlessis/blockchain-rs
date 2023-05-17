@@ -143,20 +143,20 @@ fn info(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &Blockc
 
     println!("Signed Loans:");
     let loans = blockchain.loans_of(&serde_json::to_string(&user.1).unwrap(), true);
-    for loan in loans {
-        println!("Amount {} to {}", loan.1, loan.0);
+    for (hash, (to, amount)) in loans {
+        println!("Hash: {:?} Amount: {} To: {}", hash, amount, to);
     }
     let loans = blockchain.all_loans_of(&serde_json::to_string(&user.1).unwrap());
-    for loan in loans {
-        println!("Amount {} to {}", loan.1, loan.0);
+    for (hash, (to, amount)) in loans {
+        println!("Hash: {:?} Amount: {} To: {}", hash, amount, to);
     }
 
     println!();
 
     println!("Unsigned Loans:");
     let loans = blockchain.loans_of(&serde_json::to_string(&user.1).unwrap(), false);
-    for loan in loans {
-        println!("Amount {} to {}", loan.1, loan.0);
+    for (hash, (to, amount)) in loans {
+        println!("Hash: {:?} Amount: {} To: {}", hash, amount, to);
     }
 }
 
@@ -191,4 +191,38 @@ fn loan(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &mut Bl
 
     transaction.sign_transaction(&payer.0).unwrap();
     blockchain.add_transaction(transaction).unwrap();
+}
+
+fn sign_loan(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &mut Blockchain) {
+    println!("Who is signing");
+    let input: String = read!("{}\n");
+    let user = if let Some(user) = users.get(&input) {
+        user
+    } else {
+        println!("No user found.");
+        return;
+    };
+
+    println!("Unsigned Loans:");
+    let loans = blockchain.loans_of(&serde_json::to_string(&user.1).unwrap(), false);
+    let transactions = loans.iter().collect::<Vec<_>>();
+    for (i, (hash, (to, amount))) in transactions.iter().enumerate() {
+        println!("{i}. Hash: {:?} Amount: {} To: {}", hash, amount, to);
+    }
+    println!("\nEnter a number to sign");
+    let pos: usize = read!("{}\n");
+    match blockchain.sign_loan(&user.0, *transactions[pos].0) {
+        Ok(_) => (),
+        Err(e) => match e {
+            blockchain::BlockchainError::InvalidTransaction => todo!(),
+            blockchain::BlockchainError::NegativeBalance => todo!(),
+            blockchain::BlockchainError::BalanceTooSmall => todo!(),
+            blockchain::BlockchainError::InvalidSigner => {
+                println!("Failed: User is not involved in this loan")
+            }
+            blockchain::BlockchainError::NoTransactionFound => {
+                println!("Failed: Transaction not found")
+            }
+        },
+    }
 }

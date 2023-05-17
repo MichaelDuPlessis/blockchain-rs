@@ -3,6 +3,7 @@ use crate::{
     transaction::{self, Transaction, TransactionKind},
 };
 use indexmap::IndexMap;
+use k256::ecdsa::SigningKey;
 
 const REWARD: u64 = 1000; // for now just constant
 
@@ -11,6 +12,8 @@ pub enum BlockchainError {
     InvalidTransaction,
     NegativeBalance,
     BalanceTooSmall,
+    InvalidSigner,
+    NoTransactionFound,
 }
 
 // The actual blockchain
@@ -54,7 +57,7 @@ impl Blockchain {
             let loans = self.all_loans_of(transaction.to());
             let mut amount_recieved = transaction.amount();
 
-            for (to, amount) in &loans {
+            for (_, (to, amount)) in &loans {
                 if let Some(remaining) = amount_recieved.checked_sub(*amount) {
                     amount_recieved = remaining;
                     transactions.push(Transaction::new(
@@ -142,18 +145,14 @@ impl Blockchain {
 
     // for all loans returns the address and amount owed to an address
     // looks in blockchain
-    pub fn all_loans_of(&self, address: &str) -> IndexMap<&str, u64> {
+    pub fn all_loans_of(&self, address: &str) -> IndexMap<[u8; 32], (&str, u64)> {
         let mut loans = IndexMap::new();
 
         for block in self.blocks() {
             for transaction in block.transactions() {
                 if transaction.is_loan() {
                     if transaction.to() == address {
-                        if let Some(loan) = loans.get_mut(transaction.to()) {
-                            *loan += transaction.amount();
-                        } else {
-                            loans.insert(transaction.to(), transaction.amount());
-                        }
+                        loans.insert(transaction.hash(), (transaction.to(), transaction.amount()));
                     }
                 }
             }
@@ -164,22 +163,35 @@ impl Blockchain {
 
     // returns the loans of a user
     // looks in mempool
-    pub fn loans_of(&self, address: &str, valid: bool) -> IndexMap<&str, u64> {
+    pub fn loans_of(&self, address: &str, valid: bool) -> IndexMap<[u8; 32], (&str, u64)> {
         let mut loans = IndexMap::new();
 
         for transaction in &self.mempool {
             if transaction.is_loan() && transaction.loan_signed() == valid {
                 if transaction.to() == address {
-                    if let Some(loan) = loans.get_mut(transaction.to()) {
-                        *loan += transaction.amount();
-                    } else {
-                        loans.insert(transaction.to(), transaction.amount());
-                    }
+                    loans.insert(transaction.hash(), (transaction.to(), transaction.amount()));
                 }
             }
         }
 
         loans
+    }
+
+    pub fn sign_loan(
+        &mut self,
+        payee: &SigningKey,
+        transaction_hash: [u8; 32],
+    ) -> Result<(), BlockchainError> {
+        let Some(transaction) = self
+            .mempool
+            .iter_mut()
+            .find(|transaction| transaction.hash() == transaction_hash) else {
+                return Err(BlockchainError::NoTransactionFound); 
+            };
+
+        transaction.sign_loan_transaction(payee);
+
+        Ok(())
     }
 
     pub fn paid_to(&self, from: &str, to: &str) -> u64 {
