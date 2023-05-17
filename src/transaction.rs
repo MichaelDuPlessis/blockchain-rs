@@ -12,10 +12,10 @@ pub enum TransactionError {
     ForeignPubkey,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum TransactionKind {
     Normal,
-    Loan,
+    Loan(Option<Vec<u8>>), // the other parties signiture
     Repayment,
 }
 
@@ -23,16 +23,22 @@ impl TransactionKind {
     fn bytes(&self) -> &[u8] {
         match self {
             TransactionKind::Normal => &[0],
-            TransactionKind::Loan => &[1],
+            TransactionKind::Loan(_) => &[1],
             TransactionKind::Repayment => &[2],
         }
     }
 
     fn is_loan(&self) -> bool {
-        if self == &TransactionKind::Loan {
-            true
-        } else {
-            false
+        match self {
+            TransactionKind::Loan(_) => true,
+            _ => false,
+        }
+    }
+
+    fn loan_signed(&self) -> bool {
+        match self {
+            TransactionKind::Loan(sig) => sig.is_some(),
+            _ => false,
         }
     }
 }
@@ -58,6 +64,10 @@ impl Transaction {
             signiture: Vec::new(),
             kind,
         }
+    }
+
+    pub fn loan_signed(&self) -> bool {
+        self.valid() && self.kind.loan_signed()
     }
 
     pub fn is_loan(&self) -> bool {

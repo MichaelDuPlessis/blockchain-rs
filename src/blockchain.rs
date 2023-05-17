@@ -49,7 +49,8 @@ impl Blockchain {
             TransactionKind::Normal,
         )]; // creating new mempool with reward
 
-        for transaction in &self.mempool {
+        let mut to_remove = Vec::new();
+        for (i, transaction) in self.mempool.iter().enumerate() {
             let loans = self.loans_of(transaction.to());
             let mut amount_recieved = transaction.amount();
 
@@ -58,7 +59,7 @@ impl Blockchain {
                     amount_recieved = remaining;
                     transactions.push(Transaction::new(
                         Some(transaction.to().to_owned()),
-                        to.to_owned().to_owned(),
+                        (*to).to_owned(),
                         *amount,
                         TransactionKind::Repayment,
                     ));
@@ -66,6 +67,17 @@ impl Blockchain {
                     break;
                 }
             }
+
+            // if there is a loan but it has not been signed by both parties then it must not be
+            // mined
+            if transaction.is_loan() && !transaction.loan_signed() {
+                to_remove.push(i)
+            }
+        }
+
+        // moving transavtions back to mempool
+        for i in to_remove {
+            transactions.push(self.mempool.remove(i))
         }
 
         std::mem::swap(&mut transactions, &mut self.mempool);
