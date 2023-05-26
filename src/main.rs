@@ -3,61 +3,45 @@ mod blockchain;
 mod keygen;
 mod transaction;
 
+use crate::transaction::TransactionKind;
 use blockchain::Blockchain;
 use k256::ecdsa::{SigningKey, VerifyingKey};
 use std::collections::HashMap;
 use text_io::read;
 use transaction::Transaction;
 
-use crate::transaction::TransactionKind;
-
-enum Input {
-    List,
-    Pay,
-    Add,
-    Loan,
-    Info,
-    Mine,
-    Exit,
-    Invalid,
-}
-
-impl From<String> for Input {
-    fn from(value: String) -> Self {
-        match value.as_ref() {
-            "list" => Self::List,
-            "pay" => Self::Pay,
-            "add" => Self::Add,
-            "loan" => Self::Loan,
-            "info" => Self::Info,
-            "mine" => Self::Mine,
-            "exit" => Self::Exit,
-            _ => Self::Invalid,
-        }
-    }
-}
-
 fn main() {
     let mut blockchain = Blockchain::default();
     let mut users: HashMap<String, (SigningKey, VerifyingKey)> = HashMap::new();
 
     loop {
-        println!("Enter a command: (list, pay, add, loan, info, mine, exit)");
+        println!("Enter a command: (list, pay, add, loan, info, mine, sign, print, exit)");
         let input: String = read!("{}\n");
-        let input = Input::from(input);
 
-        match input {
-            Input::List => list(&users),
-            Input::Pay => pay(&users, &mut blockchain),
-            Input::Loan => loan(&users, &mut blockchain),
-            Input::Add => add(&mut users),
-            Input::Info => info(&users, &blockchain),
-            Input::Mine => mine(&users, &mut blockchain),
-            Input::Exit => break,
-            Input::Invalid => println!("Unknown command."),
+        match input.to_lowercase().as_str() {
+            "list" => list(&users),
+            "pay" => pay(&users, &mut blockchain),
+            "add" => loan(&users, &mut blockchain),
+            "loan" => add(&mut users),
+            "info" => info(&users, &blockchain),
+            "mine" => mine(&users, &mut blockchain),
+            "print" => print_blockchain(&blockchain),
+            "exit" => sign_loan(&users, &mut blockchain),
+            "sign" => break,
+            _ => println!("Unknown command."),
         }
 
         println!();
+    }
+}
+
+fn print_blockchain(blockchain: &Blockchain) {
+    for block in blockchain.blocks() {
+        println!(
+            "Prev hash: {:X?}\nHash: {:X?}",
+            block.prev_hash(),
+            block.hash()
+        )
     }
 }
 
@@ -144,11 +128,11 @@ fn info(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &Blockc
     println!("Signed Loans:");
     let loans = blockchain.loans_of(&serde_json::to_string(&user.1).unwrap(), true);
     for (hash, (to, amount)) in loans {
-        println!("Hash: {:?} Amount: {} To: {}", hash, amount, to);
+        println!("Hash: {:X?} Amount: {} To: {}", hash, amount, to);
     }
     let loans = blockchain.all_loans_of(&serde_json::to_string(&user.1).unwrap());
     for (hash, (to, amount)) in loans {
-        println!("Hash: {:?} Amount: {} To: {}", hash, amount, to);
+        println!("Hash: {:X?} Amount: {} To: {}", hash, amount, to);
     }
 
     println!();
@@ -156,7 +140,7 @@ fn info(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &Blockc
     println!("Unsigned Loans:");
     let loans = blockchain.loans_of(&serde_json::to_string(&user.1).unwrap(), false);
     for (hash, (to, amount)) in loans {
-        println!("Hash: {:?} Amount: {} To: {}", hash, amount, to);
+        println!("Hash: {:X?} Amount: {} To: {}", hash, amount, to);
     }
 }
 
@@ -207,7 +191,7 @@ fn sign_loan(users: &HashMap<String, (SigningKey, VerifyingKey)>, blockchain: &m
     let loans = blockchain.loans_of(&serde_json::to_string(&user.1).unwrap(), false);
     let transactions = loans.iter().collect::<Vec<_>>();
     for (i, (hash, (to, amount))) in transactions.iter().enumerate() {
-        println!("{i}. Hash: {:?} Amount: {} To: {}", hash, amount, to);
+        println!("{i}. Hash: {:X?} Amount: {} To: {}", hash, amount, to);
     }
     println!("\nEnter a number to sign");
     let pos: usize = read!("{}\n");
